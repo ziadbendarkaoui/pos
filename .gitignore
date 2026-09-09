@@ -10,3 +10,6 @@ coverage/
 .npm-cache/
 tastypizza-production-build/
 *.zip
+.wrangler/
+.dev.vars*
+admin-access*.txt

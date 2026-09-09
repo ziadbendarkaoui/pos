@@ -1,4 +1,9 @@
 export type Language = 'fr' | 'ar';
+export interface SiteContent {
+  menuItems: MenuItem[];
+  categories: Category[];
+  restaurantInfo: ContactInfo;
+}
 
 export type CategoryId =
   | 'pizzas'

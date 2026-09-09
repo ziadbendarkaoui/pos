@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, ImagePlus, RotateCcw, Save, Search, Store, UtensilsCrossed } from 'lucide-react';
 import { MenuItem } from '../types';
-import { resetSiteContent, saveSiteContent, SiteContent } from '../data/contentStore';
+import { DEFAULT_SITE_CONTENT, loadOnlineContent, publishSiteContent, readLegacyContent, SiteContent } from '../data/contentStore';
 import { Logo } from './Logo';
 
 export const AdminDashboard: React.FC<{ content: SiteContent; onExit: () => void }> = ({ content, onExit }) => {
@@ -10,6 +10,18 @@ export const AdminDashboard: React.FC<{ content: SiteContent; onExit: () => void
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(content.menuItems[0]?.id ?? '');
   const [saved, setSaved] = useState(false);
+  const [password, setPassword] = useState('');
+  const [revision, setRevision] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState('Chargement du contenu en ligne…');
+  const [legacy] = useState(readLegacyContent);
+  const load = async () => {
+    setBusy(true);
+    try { const result = await loadOnlineContent(); setDraft(result.content); setRevision(result.revision); setStatus('Contenu en ligne chargé.'); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Connexion impossible.'); }
+    finally { setBusy(false); }
+  };
+  useEffect(() => { void load(); }, []);
   const [imageStatus, setImageStatus] = useState('');
   const selected = draft.menuItems.find((item) => item.id === selectedId);
   const filtered = useMemo(() => draft.menuItems.filter((item) => `${item.nameFr} ${item.nameAr}`.toLowerCase().includes(query.toLowerCase())), [draft.menuItems, query]);
@@ -18,10 +30,18 @@ export const AdminDashboard: React.FC<{ content: SiteContent; onExit: () => void
 
   const updateProduct = (patch: Partial<MenuItem>) => setDraft((current) => ({ ...current, menuItems: current.menuItems.map((item) => item.id === selectedId ? { ...item, ...patch } : item) }));
   const updateRestaurant = (key: keyof SiteContent['restaurantInfo'], value: string) => setDraft((current) => ({ ...current, restaurantInfo: { ...current.restaurantInfo, [key]: value } }));
-  const save = () => { saveSiteContent(draft); setSaved(true); window.setTimeout(() => setSaved(false), 1800); };
-  const reset = () => { if (window.confirm('Restaurer toutes les données d’origine ?')) { resetSiteContent(); window.location.reload(); } };
+  const save = async () => {
+    if (busy) return;
+    if (revision === null) { setStatus('Chargez d’abord le contenu en ligne.'); return; }
+    setBusy(true); setSaved(false); setStatus('Publication des modifications et des photos…');
+    try { const result = await publishSiteContent(draft, revision, password); setDraft(result.content); setRevision(result.revision); setSaved(true); setStatus('Publié en ligne : vos modifications sont visibles par tous.'); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Publication impossible.'); }
+    finally { setBusy(false); }
+  };
+  const reset = () => { if (!busy && window.confirm('Charger les données d’origine dans le formulaire ? Elles seront publiées seulement après Enregistrer.')) { setDraft(structuredClone(DEFAULT_SITE_CONTENT)); setStatus('Données d’origine chargées dans le formulaire. Enregistrez pour les publier.'); } };
   const importImage = async (file?: File) => {
     if (!file || !file.type.startsWith('image/')) return;
+    const targetId = selectedId;
     setImageStatus('Optimisation en cours…');
     try {
       const bitmap = await createImageBitmap(file);
@@ -34,7 +54,8 @@ export const AdminDashboard: React.FC<{ content: SiteContent; onExit: () => void
       bitmap.close();
       const optimized = canvas.toDataURL('image/webp', 0.78);
       const approximateBytes = Math.round((optimized.length - optimized.indexOf(',') - 1) * 0.75);
-      updateProduct({ image: optimized });
+      if (approximateBytes > 1024 * 1024) throw new Error('Photo trop volumineuse.');
+      setDraft(current => ({ ...current, menuItems: current.menuItems.map(item => item.id === targetId ? { ...item, image: optimized } : item) }));
       setImageStatus(`Optimisée en WebP · ${width}×${height} px · ${(approximateBytes / 1024).toFixed(0)} Ko`);
     } catch {
       setImageStatus('Impossible de traiter cette image. Utilisez JPG, PNG ou WebP.');
@@ -47,7 +68,18 @@ export const AdminDashboard: React.FC<{ content: SiteContent; onExit: () => void
       <div className="flex items-center gap-2"><button onClick={onExit} className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 px-3 text-xs font-bold hover:bg-white/10"><ArrowLeft className="h-4 w-4" /><span className="hidden sm:inline">Voir le site</span></button><button onClick={save} className="flex min-h-11 items-center gap-2 rounded-xl bg-[#C81024] px-4 text-xs font-black"><Save className="h-4 w-4" />{saved ? 'Enregistré' : 'Enregistrer'}{saved && <Check className="h-4 w-4" />}</button></div>
     </div></header>
 
-    <main className="mx-auto grid max-w-[1500px] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[230px_1fr]">
+    <section className="mx-auto max-w-[1500px] px-4 pt-5 sm:px-6" aria-label="Publication en ligne">
+      <div className="rounded-2xl border border-white/10 bg-[#111] p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="min-w-0 flex-1"><span className={label}>Mot de passe administrateur</span><input type="password" autoComplete="current-password" className={input} value={password} onChange={e => setPassword(e.target.value)} placeholder="Nécessaire pour publier" /></label>
+          <button disabled={busy} onClick={() => { if (window.confirm('Recharger la version en ligne et remplacer les modifications du formulaire ?')) void load(); }} className="min-h-11 rounded-xl border border-white/20 px-4 text-sm disabled:opacity-50">Recharger en ligne</button>
+          {legacy && <button disabled={busy} onClick={() => { if (window.confirm('Récupérer les anciennes modifications de ce navigateur dans le formulaire ?')) { setDraft(legacy); setStatus('Anciennes modifications récupérées. Enregistrez pour les publier en ligne.'); } }} className="min-h-11 rounded-xl border border-white/20 px-4 text-sm disabled:opacity-50">Récupérer mes anciennes modifications</button>}
+        </div>
+        <p role="status" aria-live="polite" className="mt-3 text-sm text-[#FFD800]">{status}</p>
+        <p className="mt-2 text-xs text-white/50">Enregistrer publie les modifications sur le site pour tous les appareils. Le mot de passe reste uniquement dans cette page.</p>
+      </div>
+    </section>
+    <main aria-busy={busy} className={`mx-auto grid max-w-[1500px] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[230px_1fr] ${busy || revision === null ? 'pointer-events-none opacity-50' : ''}`} inert={busy || revision === null}>
       <aside className="h-fit rounded-2xl border border-white/10 bg-[#111] p-2 lg:sticky lg:top-24"><div className="grid grid-cols-2 gap-2 lg:grid-cols-1"><button onClick={() => setTab('products')} className={`flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-bold ${tab === 'products' ? 'bg-[#C81024]' : 'text-white/60 hover:bg-white/5'}`}><UtensilsCrossed className="h-5 w-5" />Produits</button><button onClick={() => setTab('restaurant')} className={`flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-bold ${tab === 'restaurant' ? 'bg-[#C81024]' : 'text-white/60 hover:bg-white/5'}`}><Store className="h-5 w-5" />Restaurant</button></div><button onClick={reset} className="mt-3 flex min-h-11 w-full items-center gap-3 border-t border-white/10 px-4 pt-3 text-xs font-bold text-white/45 hover:text-white"><RotateCcw className="h-4 w-4" />Restaurer l’origine</button></aside>
 
       {tab === 'products' ? <section className="grid min-w-0 gap-5 xl:grid-cols-[360px_1fr]">

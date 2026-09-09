@@ -1,4 +1,5 @@
 {
+  "exclude": ["worker", "worker-configuration.d.ts", "node_modules"],
   "compilerOptions": {
     "target": "ES2022",
     "experimentalDecorators": true,

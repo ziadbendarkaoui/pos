@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pos",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-09",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"] },
+  "d1_databases": [{ "binding": "CONTENT_DB", "database_name": "tasty-pizza-content", "database_id": "ce7204e6-e61c-4cbb-bffe-7fb4eb49ba9e", "migrations_dir": "migrations" }],
+  "kv_namespaces": [{ "binding": "MENU_IMAGES", "id": "e2b2d6fe2fbe430285fb4ae74a316d68" }],
+  "observability": { "enabled": true }
+}
