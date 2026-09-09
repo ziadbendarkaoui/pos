@@ -1,9 +1,9 @@
 import { CATEGORIES, MENU_ITEMS, RESTAURANT_INFO } from '../src/data/menuData';
 import type { SiteContent, ContactInfo } from '../src/types';
 
-type Bindings = Env & { ADMIN_PASSWORD?: string };
 const defaults = { menuItems: MENU_ITEMS, categories: CATEGORIES, restaurantInfo: RESTAURANT_INFO };
 const allowedOrigins = ['https://ziadbendarkaoui.github.io', 'https://pos.ziadbendarkaoui.workers.dev'];
+const initialAdminPassword = '1234';
 
 function validContent(value: unknown): value is SiteContent {
   if (!value || typeof value !== 'object') return false;
@@ -41,6 +41,28 @@ async function boundedBody(request: Request, max: number) {
   return bytes;
 }
 
+async function sha256Hex(value: string) {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+  return [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function getAdminPasswordHash(env: Env) {
+  const row = await env.CONTENT_DB.prepare('SELECT value FROM admin_settings WHERE key = ?').bind('password_hash').first<{ value: string }>();
+  if (row?.value) return row.value;
+  const hash = await sha256Hex(initialAdminPassword);
+  await env.CONTENT_DB.prepare('INSERT OR IGNORE INTO admin_settings (key, value, updated_at) VALUES (?, ?, ?)').bind('password_hash', hash, new Date().toISOString()).run();
+  return hash;
+}
+
+async function verifyAdminPassword(env: Env, password: string) {
+  const [provided, expected] = await Promise.all([sha256Hex(password), getAdminPasswordHash(env)]);
+  return crypto.subtle.timingSafeEqual(new TextEncoder().encode(provided), new TextEncoder().encode(expected));
+}
+
+function validAdminPassword(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length >= 4 && value.length <= 128;
+}
+
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
@@ -61,18 +83,23 @@ export default {
         if (!image) return json({ error: 'Photo introuvable.' }, 404);
         return new Response(image, { headers: { ...headers, 'Content-Type': 'image/webp', 'Cache-Control': 'public, max-age=31536000, immutable' } });
       }
-      if (url.pathname !== '/api/content' && url.pathname !== '/api/images') return json({ error: 'Introuvable.' }, 404);
+      if (url.pathname !== '/api/content' && url.pathname !== '/api/images' && url.pathname !== '/api/admin/password') return json({ error: 'Introuvable.' }, 404);
       if (request.method === 'GET' && url.pathname === '/api/content') {
         const row = await env.CONTENT_DB.prepare('SELECT content, revision FROM site_content WHERE id = 1').first<{content: string; revision: number}>();
         const content: SiteContent = row ? JSON.parse(row.content) : structuredClone(defaults);
         content.menuItems = content.menuItems.map(item => ({ ...item, image: new URL(item.image, url.origin).href }));
         return json({ content, revision: row?.revision ?? 0 });
       }
-      if (!env.ADMIN_PASSWORD) return json({ error: 'La protection administrateur doit être configurée sur Cloudflare.' }, 503);
       const password = request.headers.get('Authorization')?.replace(/^Bearer /, '') ?? '';
-      const hash = (s: string) => crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-      const [provided, expected] = await Promise.all([hash(password), hash(env.ADMIN_PASSWORD)]);
-      if (!crypto.subtle.timingSafeEqual(provided, expected)) return json({ error: 'Mot de passe incorrect.' }, 401);
+      if (!await verifyAdminPassword(env, password)) return json({ error: 'Mot de passe incorrect.' }, 401);
+      if (request.method === 'POST' && url.pathname === '/api/admin/password') {
+        const bytes = await boundedBody(request, 8 * 1024);
+        let payload: { newPassword?: unknown };
+        try { payload = JSON.parse(new TextDecoder().decode(bytes)); } catch { return json({ error: 'JSON invalide.' }, 400); }
+        if (!validAdminPassword(payload.newPassword)) return json({ error: 'Le nouveau mot de passe doit contenir au moins 4 caractères.' }, 400);
+        await env.CONTENT_DB.prepare('UPDATE admin_settings SET value = ?, updated_at = ? WHERE key = ?').bind(await sha256Hex(payload.newPassword.trim()), new Date().toISOString(), 'password_hash').run();
+        return json({ ok: true });
+      }
       if (request.method === 'POST' && url.pathname === '/api/images') {
         if (request.headers.get('Content-Type') !== 'image/webp') return json({ error: 'Photo WebP requise.' }, 415);
         const bytes = await boundedBody(request, 1024 * 1024);
@@ -100,4 +127,4 @@ export default {
       return json({ error: 'Synchronisation indisponible. Vos modifications ne sont pas publiées.' }, 503);
     }
   },
-} satisfies ExportedHandler<Bindings>;
+} satisfies ExportedHandler<Env>;

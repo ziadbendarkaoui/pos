@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Check, ImagePlus, RotateCcw, Save, Search, Store, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, Check, ImagePlus, KeyRound, RotateCcw, Save, Search, Store, UtensilsCrossed } from 'lucide-react';
 import { MenuItem } from '../types';
-import { DEFAULT_SITE_CONTENT, loadOnlineContent, publishSiteContent, readLegacyContent, SiteContent } from '../data/contentStore';
+import { changeAdminPassword, DEFAULT_SITE_CONTENT, loadOnlineContent, publishSiteContent, readLegacyContent, SiteContent } from '../data/contentStore';
 import { Logo } from './Logo';
 
 export const AdminDashboard: React.FC<{ content: SiteContent; onExit: () => void }> = ({ content, onExit }) => {
@@ -11,6 +11,7 @@ export const AdminDashboard: React.FC<{ content: SiteContent; onExit: () => void
   const [selectedId, setSelectedId] = useState(content.menuItems[0]?.id ?? '');
   const [saved, setSaved] = useState(false);
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [revision, setRevision] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('Chargement du contenu en ligne…');
@@ -37,6 +38,18 @@ export const AdminDashboard: React.FC<{ content: SiteContent; onExit: () => void
     try { const result = await publishSiteContent(draft, revision, password); setDraft(result.content); setRevision(result.revision); setSaved(true); setStatus('Publié en ligne : vos modifications sont visibles par tous.'); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'Publication impossible.'); }
     finally { setBusy(false); }
+  };
+  const updatePassword = async () => {
+    if (busy) return;
+    setBusy(true); setSaved(false); setStatus('Changement du mot de passe administrateur…');
+    try {
+      await changeAdminPassword(password, newPassword);
+      setPassword(newPassword.trim());
+      setNewPassword('');
+      setStatus('Mot de passe administrateur modifié. L’ancien mot de passe est annulé.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Changement impossible.');
+    } finally { setBusy(false); }
   };
   const reset = () => { if (!busy && window.confirm('Charger les données d’origine dans le formulaire ? Elles seront publiées seulement après Enregistrer.')) { setDraft(structuredClone(DEFAULT_SITE_CONTENT)); setStatus('Données d’origine chargées dans le formulaire. Enregistrez pour les publier.'); } };
   const importImage = async (file?: File) => {
@@ -76,7 +89,13 @@ export const AdminDashboard: React.FC<{ content: SiteContent; onExit: () => void
           {legacy && <button disabled={busy} onClick={() => { if (window.confirm('Récupérer les anciennes modifications de ce navigateur dans le formulaire ?')) { setDraft(legacy); setStatus('Anciennes modifications récupérées. Enregistrez pour les publier en ligne.'); } }} className="min-h-11 rounded-xl border border-white/20 px-4 text-sm disabled:opacity-50">Récupérer mes anciennes modifications</button>}
         </div>
         <p role="status" aria-live="polite" className="mt-3 text-sm text-[#FFD800]">{status}</p>
-        <p className="mt-2 text-xs text-white/50">Enregistrer publie les modifications sur le site pour tous les appareils. Le mot de passe reste uniquement dans cette page.</p>
+        <div className="mt-4 border-t border-white/10 pt-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="min-w-0 flex-1"><span className={label}>Nouveau mot de passe</span><input type="password" autoComplete="new-password" className={input} value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Exemple : 1234" /></label>
+            <button disabled={busy || newPassword.trim().length < 4} onClick={updatePassword} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#FFD800]/40 px-4 text-sm font-bold text-[#FFD800] disabled:opacity-50"><KeyRound className="h-4 w-4" />Changer le mot de passe</button>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-white/50">Enregistrer publie les modifications sur le site pour tous les appareils. Le mot de passe par défaut est 1234, puis vous pouvez le changer ici.</p>
       </div>
     </section>
     <main aria-busy={busy} className={`mx-auto grid max-w-[1500px] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[230px_1fr] ${busy || revision === null ? 'pointer-events-none opacity-50' : ''}`} inert={busy || revision === null}>

@@ -69,6 +69,16 @@ export async function publishSiteContent(content: SiteContent, revision: number,
   return result;
 }
 
+export async function changeAdminPassword(currentPassword: string, newPassword: string) {
+  if (!currentPassword) throw new Error('Saisissez le mot de passe actuel.');
+  if (newPassword.trim().length < 4) throw new Error('Le nouveau mot de passe doit contenir au moins 4 caractères.');
+  await api('admin/password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${currentPassword}` },
+    body: JSON.stringify({ newPassword: newPassword.trim() }),
+  });
+}
+
 export function resetSiteContent() {
   localStorage.removeItem(STORAGE_KEY);
   window.dispatchEvent(new Event(CHANGE_EVENT));
