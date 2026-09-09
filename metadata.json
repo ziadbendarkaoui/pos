@@ -1,0 +1,6 @@
+{
+  "name": "Tasty Pizza - Catalogue & Menu Street Food",
+  "description": "Catalogue digital moderne, gourmand et mobile-first pour la pizzeria marocaine Tasty Pizza. Consultez nos pizzas, tacos, baguettas, panozzos et prix officiels en DH.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

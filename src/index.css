@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --brand-black: #050505;
+    --brand-red: #C81024;
+    --brand-yellow: #FFD800;
+    --brand-cream: #FFF7E8;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+.font-display {
+  font-family: 'Anton', Impact, 'Arial Black', sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.font-body {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+.font-arabic {
+  font-family: 'Cairo', system-ui, sans-serif;
+}
+
+/* Hide scrollbar for horizontal category scrolling on touch devices */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 440" width="100%" height="100%">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Alfa+Slab+One&amp;display=swap');
+      .brand-title {
+        font-family: 'Alfa Slab One', 'Arial Black', Impact, serif;
+        font-weight: 900;
+        fill: #C81024;
+        text-anchor: middle;
+      }
+    </style>
+  </defs>
+
+  <!-- Page 3 Vector Variant: Stacked Official Badge -->
+  <g transform="translate(60, 20)">
+    <!-- Big Red Square Box -->
+    <rect x="0" y="0" width="280" height="280" fill="#C81024" rx="4" />
+
+    <!-- 1. Top White Pizza Crust Arc -->
+    <path
+      d="M 0 124 
+         C 16 56, 96 12, 230 0 
+         L 230 20 
+         C 114 30, 42 72, 0 160 
+         Z"
+      fill="#FFFFFF"
+    />
+
+    <!-- 2. Main White Pizza Cheese Wedge -->
+    <path
+      d="M 0 190
+         C 54 110, 142 64, 280 84
+         L 280 194
+         L 220 242
+         L 152 214
+         A 28 28 0 0 1 100 202
+         L 0 190
+         Z"
+      fill="#FFFFFF"
+    />
+
+    <!-- 3. Red Pepperoni Toppings -->
+    <circle cx="180" cy="124" r="22" fill="#C81024" />
+    <circle cx="120" cy="162" r="20" fill="#C81024" />
+    <circle cx="210" cy="202" r="18" fill="#C81024" />
+    <circle cx="280" cy="132" r="22" fill="#C81024" />
+  </g>
+
+  <!-- Centered Typography below the emblem -->
+  <g transform="translate(200, 310)">
+    <text x="0" y="52" class="brand-title" font-size="64" letter-spacing="0.05em">TASTY</text>
+    <text x="0" y="112" class="brand-title" font-size="64" letter-spacing="0.08em">PIZZA</text>
+  </g>
+</svg>
