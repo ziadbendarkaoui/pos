@@ -14,6 +14,7 @@ import { QuickMobileBar } from './components/QuickMobileBar';
 import { CartItem, CategoryId, Language, MenuItem } from './types';
 import { useSiteContent } from './data/contentStore';
 import { AdminDashboard } from './components/AdminDashboard';
+import { AdminLogin } from './components/AdminLogin';
 
 type CatalogueSectionId = CategoryId | 'popular';
 const CART_STORAGE_KEY = 'tasty-pizza-cart-v2';
@@ -21,6 +22,7 @@ const CART_STORAGE_KEY = 'tasty-pizza-cart-v2';
 export default function App() {
   const content = useSiteContent();
   const [adminMode, setAdminMode] = useState(() => window.location.hash === '#admin');
+  const [adminPassword, setAdminPassword] = useState('');
   const [lang, setLang] = useState<Language>('fr');
   const [activeCategory, setActiveCategory] = useState<CatalogueSectionId>('popular');
   const [searchQuery, setSearchQuery] = useState('');
@@ -32,7 +34,7 @@ export default function App() {
   });
 
   useEffect(() => { document.documentElement.lang = lang; document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'; }, [lang]);
-  useEffect(() => { const sync = () => setAdminMode(window.location.hash === '#admin'); window.addEventListener('hashchange', sync); return () => window.removeEventListener('hashchange', sync); }, []);
+  useEffect(() => { const sync = () => { const enabled = window.location.hash === '#admin'; setAdminMode(enabled); if (!enabled) setAdminPassword(''); }; window.addEventListener('hashchange', sync); return () => window.removeEventListener('hashchange', sync); }, []);
   useEffect(() => { localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart)); }, [cart]);
 
   useEffect(() => {
@@ -49,7 +51,7 @@ export default function App() {
   const matchesSearch = (item: MenuItem) => !normalizedSearch || [item.nameFr, item.nameAr, item.descriptionFr, item.descriptionAr].some((value) => value?.toLocaleLowerCase().includes(normalizedSearch));
   const availableItems = content.menuItems.filter((item) => item.isAvailable !== false);
   const matchedProducts = useMemo(() => availableItems.filter(matchesSearch), [normalizedSearch, content.menuItems]);
-  const popularProducts = availableItems.filter((item) => item.badgeType === 'popular' || item.badgeType === 'signature').filter(matchesSearch);
+  const popularProducts = availableItems.filter((item) => item.badgeType === 'popular' || item.badgeType === 'signature' || item.badgeType === 'promo').filter(matchesSearch);
   const visibleCategories = content.categories.filter((category) => category.id !== 'supplements' && category.id !== 'informations').map((category) => ({ category, items: availableItems.filter((item) => item.categoryId === category.id).filter(matchesSearch) })).filter(({ items }) => items.length > 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -71,7 +73,8 @@ export default function App() {
   const ProductGrid = ({ items }: { items: MenuItem[] }) => <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{items.map((item) => <CompactProductCard key={item.id} item={item} lang={lang} onSelect={setSelectedProduct} />)}</div>;
   const PopularCarousel = ({ items }: { items: MenuItem[] }) => <div className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3 pe-4">{items.map((item) => <div key={item.id} className="w-[86vw] max-w-[390px] shrink-0 snap-start sm:w-[370px] lg:w-[430px] lg:max-w-[430px]"><CompactProductCard item={item} lang={lang} onSelect={setSelectedProduct} /></div>)}</div>;
 
-  if (adminMode) return <AdminDashboard content={content} onExit={() => { window.location.hash = ''; setAdminMode(false); }} />;
+  if (adminMode && !adminPassword) return <AdminLogin onSuccess={setAdminPassword} onExit={() => { window.location.hash = ''; setAdminMode(false); }} />;
+  if (adminMode) return <AdminDashboard content={content} adminPassword={adminPassword} onPasswordChanged={setAdminPassword} onExit={() => { setAdminPassword(''); window.location.hash = ''; setAdminMode(false); }} />;
 
   return <div className={`min-h-screen bg-[#050505] text-white ${lang === 'ar' ? 'font-arabic' : 'font-body'}`}>
     <Header lang={lang} onToggleLang={setLang} onNavigateSection={navigate} activeSection={activeSection} />
@@ -85,14 +88,14 @@ export default function App() {
         <div id="produits" className="mx-auto max-w-7xl space-y-12 px-4 pt-8 sm:px-6 lg:px-8">
           {popularProducts.length > 0 && <section id="menu-section-popular" data-catalogue-section="popular" className="scroll-mt-48"><div className="mb-4 flex items-center justify-between gap-3"><span className="flex items-center gap-3"><Award className="h-6 w-6 text-[#FFD800]" /><h3 className="text-2xl font-black">{lang === 'fr' ? 'Populaires' : 'الأكثر طلباً'}</h3></span><span className="text-[10px] font-bold uppercase tracking-widest text-white/35">{lang === 'fr' ? 'Glissez pour découvrir →' : 'اسحب للمزيد ←'}</span></div><PopularCarousel items={popularProducts} /></section>}
           {visibleCategories.map(({ category, items }) => <section key={category.id} id={`menu-section-${category.id}`} data-catalogue-section={category.id} className="scroll-mt-48"><div className="mb-4 flex items-end justify-between border-b border-white/10 pb-3"><h3 className="text-2xl font-black">{lang === 'fr' ? category.nameFr : category.nameAr}</h3><span className="text-xs text-white/35">{items.length}</span></div><ProductGrid items={items} /></section>)}
-          {!searchQuery && <><section id="menu-section-supplements" data-catalogue-section="supplements" className="scroll-mt-48"><SupplementsSection lang={lang} /></section><section id="menu-section-informations" data-catalogue-section="informations" className="scroll-mt-48"><CombosSection lang={lang} /></section></>}
+          {!searchQuery && <><section id="menu-section-supplements" data-catalogue-section="supplements" className="scroll-mt-48"><SupplementsSection lang={lang} supplements={content.pizzaSupplements} /></section><section id="menu-section-informations" data-catalogue-section="informations" className="scroll-mt-48"><CombosSection lang={lang} deals={content.comboDeals} /></section></>}
           {searchQuery && matchedProducts.length === 0 && <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center text-white/50">{lang === 'fr' ? 'Aucun produit trouvé.' : 'لم يتم العثور على أي منتج.'}</div>}
         </div>
       </section>
       <ContactSection lang={lang} />
     </main>
     <Footer lang={lang} onScrollTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
-    <ProductModal item={selectedProduct} onClose={() => setSelectedProduct(null)} onAddToCart={addToCart} lang={lang} />
+    <ProductModal item={selectedProduct} comboDeals={content.comboDeals} pizzaSupplements={content.pizzaSupplements} onClose={() => setSelectedProduct(null)} onAddToCart={addToCart} lang={lang} />
     <button type="button" onClick={() => setCartOpen(true)} className="fixed bottom-20 end-4 z-50 flex min-h-12 items-center gap-2 rounded-full bg-[#FFD800] px-4 font-black text-black shadow-2xl sm:bottom-6 sm:end-6" aria-label={lang === 'fr' ? 'Ouvrir le panier' : 'فتح السلة'}><ShoppingBag className="h-5 w-5" /><span>{lang === 'fr' ? 'Panier' : 'السلة'}</span>{cartCount > 0 && <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[#C81024] px-1 text-xs text-white">{cartCount}</span>}</button>
     <CartDrawer open={cartOpen} items={cart} lang={lang} onClose={() => setCartOpen(false)} onChangeQuantity={(cartId, quantity) => setCart((current) => quantity <= 0 ? current.filter((item) => item.cartId !== cartId) : current.map((item) => item.cartId === cartId ? { ...item, quantity } : item))} onRemove={(cartId) => setCart((current) => current.filter((item) => item.cartId !== cartId))} onClear={() => setCart([])} />
     <QuickMobileBar lang={lang} onNavigateSection={navigate} />

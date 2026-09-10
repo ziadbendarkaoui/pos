@@ -2,6 +2,8 @@ export type Language = 'fr' | 'ar';
 export interface SiteContent {
   menuItems: MenuItem[];
   categories: Category[];
+  comboDeals: ComboDeal[];
+  pizzaSupplements: PizzaSupplement[];
   restaurantInfo: ContactInfo;
 }
 
@@ -47,12 +49,15 @@ export interface MenuItem {
   formatLabelAr?: string;
   badgeFr?: string;
   badgeAr?: string;
-  badgeType?: 'signature' | 'popular' | 'hot' | 'veggie';
+  badgeType?: 'signature' | 'popular' | 'hot' | 'veggie' | 'promo';
+  originalPrice?: number;
+  promoPrice?: number;
   image: string;
   isAvailable?: boolean;
 }
 
 export interface PizzaSupplement {
+  id: string;
   nameFr: string;
   nameAr: string;
   prices?: {

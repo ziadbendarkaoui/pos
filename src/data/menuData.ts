@@ -31,21 +31,25 @@ export const CATEGORIES: Category[] = [
 
 export const PIZZA_SUPPLEMENTS: PizzaSupplement[] = [
   {
+    id: 'bord-fromage',
     nameFr: 'Bord au fromage',
     nameAr: 'حافة محشوة بالجبن الذائب',
     prices: { petite: 10, moyenne: 15, grande: 20 },
   },
   {
+    id: 'extra-fromage',
     nameFr: 'Extra fromage',
     nameAr: 'إكسترا جبن موزاريلا',
     prices: { petite: 5, moyenne: 10, grande: 20 },
   },
   {
+    id: 'extra-sauce-fromagere',
     nameFr: 'Extra sauce fromagère',
     nameAr: 'إكسترا صلصة الجبن الكريمية',
     prices: { petite: 5, moyenne: 10, grande: 25 },
   },
   {
+    id: 'autres-supplements',
     nameFr: 'Autres suppléments au choix',
     nameAr: 'إضافات ومكونات أخرى متنوعة',
     singlePrice: 10,

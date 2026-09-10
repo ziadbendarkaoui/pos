@@ -10,6 +10,7 @@ interface CompactProductCardProps {
 
 const getStartingPrice = (item: MenuItem) =>
   item.prices ? Math.min(...Object.values(item.prices)) : item.singlePrice ?? 0;
+const getDisplayPrice = (item: MenuItem) => item.promoPrice && item.promoPrice > 0 ? item.promoPrice : getStartingPrice(item);
 
 export const CompactProductCard: React.FC<CompactProductCardProps> = ({ item, lang, onSelect }) => {
   const name = lang === 'fr' ? item.nameFr : item.nameAr;
@@ -20,7 +21,7 @@ export const CompactProductCard: React.FC<CompactProductCardProps> = ({ item, la
       type="button"
       onClick={() => onSelect(item)}
       className="group flex min-h-[132px] w-full items-stretch overflow-hidden rounded-2xl border border-white/10 bg-[#151515] text-start shadow-lg transition hover:-translate-y-0.5 hover:border-[#FFD800]/40 hover:bg-[#191919] focus:outline-none focus:ring-2 focus:ring-[#FFD800]"
-      aria-label={`${name}, ${getStartingPrice(item)} DH`}
+      aria-label={`${name}, ${getDisplayPrice(item)} DH`}
     >
       <span className="flex min-w-0 flex-1 flex-col justify-between p-4 sm:p-5">
         <span>
@@ -38,7 +39,8 @@ export const CompactProductCard: React.FC<CompactProductCardProps> = ({ item, la
         </span>
         <span className="mt-3 flex items-center justify-between gap-2">
           <span className="text-sm font-black text-[#FFD800]">
-            {item.prices && (lang === 'fr' ? 'Dès ' : 'ابتداءً من ')}{getStartingPrice(item)} DH
+            {item.originalPrice && item.promoPrice && <span className="me-2 text-xs text-white/35 line-through">{item.originalPrice} DH</span>}
+            {item.prices && !item.promoPrice && (lang === 'fr' ? 'Dès ' : 'ابتداءً من ')}{getDisplayPrice(item)} DH
           </span>
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#C81024] text-white transition group-hover:bg-[#FFD800] group-hover:text-black">
             <Plus className="h-5 w-5" aria-hidden="true" />

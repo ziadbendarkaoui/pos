@@ -1,7 +1,7 @@
-import { CATEGORIES, MENU_ITEMS, RESTAURANT_INFO } from '../src/data/menuData';
-import type { SiteContent, ContactInfo } from '../src/types';
+import { CATEGORIES, COMBO_DEALS, MENU_ITEMS, PIZZA_SUPPLEMENTS, RESTAURANT_INFO } from '../src/data/menuData';
+import type { SiteContent, ContactInfo, ComboDeal, PizzaSupplement } from '../src/types';
 
-const defaults = { menuItems: MENU_ITEMS, categories: CATEGORIES, restaurantInfo: RESTAURANT_INFO };
+const defaults = { menuItems: MENU_ITEMS, categories: CATEGORIES, comboDeals: COMBO_DEALS, pizzaSupplements: PIZZA_SUPPLEMENTS, restaurantInfo: RESTAURANT_INFO };
 const allowedOrigins = ['https://ziadbendarkaoui.github.io', 'https://pos.ziadbendarkaoui.workers.dev'];
 const initialAdminPassword = '1234';
 
@@ -13,15 +13,37 @@ function validContent(value: unknown): value is SiteContent {
   if (!Array.isArray(c.categories) || !c.categories.length || c.categories.length > 50 ||
       !c.categories.every(x => x && text(x.id) && text(x.nameFr) && text(x.nameAr) && text(x.iconName))) return false;
   const ids = new Set(c.categories.map(x => x.id));
-  if (ids.size !== c.categories.length || !Array.isArray(c.menuItems) || !c.menuItems.length || c.menuItems.length > 500) return false;
+  if (ids.size !== c.categories.length || !Array.isArray(c.menuItems) || !c.menuItems.length || c.menuItems.length > 500 ||
+      !Array.isArray(c.comboDeals) || c.comboDeals.length > 100 || !Array.isArray(c.pizzaSupplements) || c.pizzaSupplements.length > 100) return false;
   if (new Set(c.menuItems.map(x => x?.id)).size !== c.menuItems.length) return false;
   if (!c.menuItems.every(x => x && text(x.id) && text(x.nameFr) && text(x.nameAr) && ids.has(x.categoryId) &&
     text(x.image) && (/^(https:\/\/|\/?assets\/|\/api\/images\/)/.test(x.image)) &&
     (x.descriptionFr === undefined || text(x.descriptionFr)) && (x.descriptionAr === undefined || text(x.descriptionAr)) &&
+    (x.badgeFr === undefined || text(x.badgeFr)) && (x.badgeAr === undefined || text(x.badgeAr)) &&
+    (x.badgeType === undefined || ['signature','popular','hot','veggie','promo'].includes(x.badgeType)) &&
+    (x.originalPrice === undefined || price(x.originalPrice)) && (x.promoPrice === undefined || price(x.promoPrice)) &&
     (x.isAvailable === undefined || typeof x.isAvailable === 'boolean') &&
     (x.prices ? (['petite','moyenne','grande'] as const).every(s => price(x.prices?.[s])) : price(x.singlePrice)))) return false;
+  if (new Set(c.comboDeals.map(x => x?.id)).size !== c.comboDeals.length ||
+      !c.comboDeals.every(x => x && text(x.id) && text(x.titleFr) && text(x.titleAr) && price(x.priceSupplement) && text(x.descriptionFr) && text(x.descriptionAr) &&
+      Array.isArray(x.includedItemsFr) && x.includedItemsFr.length <= 20 && x.includedItemsFr.every(text) &&
+      Array.isArray(x.includedItemsAr) && x.includedItemsAr.length <= 20 && x.includedItemsAr.every(text))) return false;
+  if (new Set(c.pizzaSupplements.map(x => x?.id)).size !== c.pizzaSupplements.length ||
+      !c.pizzaSupplements.every(x => x && text(x.id) && text(x.nameFr) && text(x.nameAr) &&
+      (x.prices ? (['petite','moyenne','grande'] as const).every(s => price(x.prices?.[s])) : price(x.singlePrice)))) return false;
   return !!c.restaurantInfo && (Object.keys(RESTAURANT_INFO) as (keyof ContactInfo)[]).every(k => text(c.restaurantInfo[k])) &&
     (['instagram','facebook','mapsUrl'] as const).every(k => /^https:\/\//.test(c.restaurantInfo[k]));
+}
+
+function normalizeContent(value: unknown): SiteContent {
+  const partial = value && typeof value === 'object' ? value as Partial<SiteContent> : {};
+  return {
+    menuItems: Array.isArray(partial.menuItems) ? partial.menuItems : MENU_ITEMS,
+    categories: Array.isArray(partial.categories) ? partial.categories : CATEGORIES,
+    comboDeals: Array.isArray(partial.comboDeals) ? partial.comboDeals as ComboDeal[] : COMBO_DEALS,
+    pizzaSupplements: Array.isArray(partial.pizzaSupplements) ? partial.pizzaSupplements as PizzaSupplement[] : PIZZA_SUPPLEMENTS,
+    restaurantInfo: { ...RESTAURANT_INFO, ...(partial.restaurantInfo ?? {}) },
+  };
 }
 
 async function boundedBody(request: Request, max: number) {
@@ -83,15 +105,16 @@ export default {
         if (!image) return json({ error: 'Photo introuvable.' }, 404);
         return new Response(image, { headers: { ...headers, 'Content-Type': 'image/webp', 'Cache-Control': 'public, max-age=31536000, immutable' } });
       }
-      if (url.pathname !== '/api/content' && url.pathname !== '/api/images' && url.pathname !== '/api/admin/password') return json({ error: 'Introuvable.' }, 404);
+      if (url.pathname !== '/api/content' && url.pathname !== '/api/images' && url.pathname !== '/api/admin/password' && url.pathname !== '/api/admin/login') return json({ error: 'Introuvable.' }, 404);
       if (request.method === 'GET' && url.pathname === '/api/content') {
         const row = await env.CONTENT_DB.prepare('SELECT content, revision FROM site_content WHERE id = 1').first<{content: string; revision: number}>();
-        const content: SiteContent = row ? JSON.parse(row.content) : structuredClone(defaults);
+        const content: SiteContent = row ? normalizeContent(JSON.parse(row.content)) : structuredClone(defaults);
         content.menuItems = content.menuItems.map(item => ({ ...item, image: new URL(item.image, url.origin).href }));
         return json({ content, revision: row?.revision ?? 0 });
       }
       const password = request.headers.get('Authorization')?.replace(/^Bearer /, '') ?? '';
       if (!await verifyAdminPassword(env, password)) return json({ error: 'Mot de passe incorrect.' }, 401);
+      if (request.method === 'POST' && url.pathname === '/api/admin/login') return json({ ok: true });
       if (request.method === 'POST' && url.pathname === '/api/admin/password') {
         const bytes = await boundedBody(request, 8 * 1024);
         let payload: { newPassword?: unknown };

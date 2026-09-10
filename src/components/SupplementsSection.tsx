@@ -1,13 +1,13 @@
 import React from 'react';
 import { PlusCircle, Info, Sparkles } from 'lucide-react';
-import { PIZZA_SUPPLEMENTS } from '../data/menuData';
-import { Language } from '../types';
+import { Language, PizzaSupplement } from '../types';
 
 interface SupplementsSectionProps {
   lang: Language;
+  supplements: PizzaSupplement[];
 }
 
-export const SupplementsSection: React.FC<SupplementsSectionProps> = ({ lang }) => {
+export const SupplementsSection: React.FC<SupplementsSectionProps> = ({ lang, supplements }) => {
   const isRtl = lang === 'ar';
 
   return (
@@ -37,7 +37,7 @@ export const SupplementsSection: React.FC<SupplementsSectionProps> = ({ lang }) 
 
       {/* Supplements Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {PIZZA_SUPPLEMENTS.map((sup, idx) => (
+        {supplements.map((sup, idx) => (
           <div
             key={idx}
             className="bg-[#1a1a1a] rounded-3xl p-6 border border-white/5 hover:border-white/20 transition-all flex flex-col justify-between shadow-lg group"

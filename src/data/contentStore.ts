@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CATEGORIES, MENU_ITEMS, RESTAURANT_INFO } from './menuData';
+import { CATEGORIES, COMBO_DEALS, MENU_ITEMS, PIZZA_SUPPLEMENTS, RESTAURANT_INFO } from './menuData';
 import type { SiteContent } from '../types';
 export type { SiteContent } from '../types';
 
@@ -12,7 +12,7 @@ let published: SiteContent | undefined;
 let loading: Promise<ContentSnapshot> | undefined;
 export interface ContentSnapshot { content: SiteContent; revision: number }
 
-export const DEFAULT_SITE_CONTENT: SiteContent = { menuItems: MENU_ITEMS, categories: CATEGORIES, restaurantInfo: RESTAURANT_INFO };
+export const DEFAULT_SITE_CONTENT: SiteContent = { menuItems: MENU_ITEMS, categories: CATEGORIES, comboDeals: COMBO_DEALS, pizzaSupplements: PIZZA_SUPPLEMENTS, restaurantInfo: RESTAURANT_INFO };
 
 export function readSiteContent(): SiteContent {
   if (published) return published;
@@ -23,6 +23,8 @@ export function readSiteContent(): SiteContent {
     return {
       menuItems: Array.isArray(parsed.menuItems) ? parsed.menuItems : MENU_ITEMS,
       categories: Array.isArray(parsed.categories) ? parsed.categories : CATEGORIES,
+      comboDeals: Array.isArray(parsed.comboDeals) ? parsed.comboDeals : COMBO_DEALS,
+      pizzaSupplements: Array.isArray(parsed.pizzaSupplements) ? parsed.pizzaSupplements : PIZZA_SUPPLEMENTS,
       restaurantInfo: { ...RESTAURANT_INFO, ...(parsed.restaurantInfo ?? {}) },
     };
   } catch { return DEFAULT_SITE_CONTENT; }
@@ -48,7 +50,7 @@ async function api(path: string, init?: RequestInit) {
 
 export function loadOnlineContent(): Promise<ContentSnapshot> {
   if (!loading) loading = api('content').then((data: ContentSnapshot) => {
-    if (!data.content || !Array.isArray(data.content.menuItems) || !Array.isArray(data.content.categories) || !data.content.restaurantInfo || !Number.isSafeInteger(data.revision)) throw new Error('Réponse du serveur invalide.');
+    if (!data.content || !Array.isArray(data.content.menuItems) || !Array.isArray(data.content.categories) || !Array.isArray(data.content.comboDeals) || !Array.isArray(data.content.pizzaSupplements) || !data.content.restaurantInfo || !Number.isSafeInteger(data.revision)) throw new Error('Réponse du serveur invalide.');
     saveSiteContent(data.content);
     return data;
   }).finally(() => { loading = undefined; });
@@ -67,6 +69,15 @@ export async function publishSiteContent(content: SiteContent, revision: number,
   const result = await api('content', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${password}` }, body: JSON.stringify({ content: prepared, revision }) });
   saveSiteContent(result.content);
   return result;
+}
+
+export async function loginAdmin(password: string) {
+  if (!password) throw new Error('Saisissez le mot de passe administrateur.');
+  await api('admin/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${password}` },
+    body: JSON.stringify({}),
+  });
 }
 
 export async function changeAdminPassword(currentPassword: string, newPassword: string) {

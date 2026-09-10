@@ -1,13 +1,13 @@
 import React from 'react';
 import { Sparkles, UtensilsCrossed, ShieldCheck, CheckCircle2 } from 'lucide-react';
-import { COMBO_DEALS } from '../data/menuData';
-import { Language } from '../types';
+import { ComboDeal, Language } from '../types';
 
 interface CombosSectionProps {
   lang: Language;
+  deals: ComboDeal[];
 }
 
-export const CombosSection: React.FC<CombosSectionProps> = ({ lang }) => {
+export const CombosSection: React.FC<CombosSectionProps> = ({ lang, deals }) => {
   const isRtl = lang === 'ar';
 
   return (
@@ -30,7 +30,7 @@ export const CombosSection: React.FC<CombosSectionProps> = ({ lang }) => {
 
       {/* Combos Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-        {COMBO_DEALS.map((deal) => (
+        {deals.map((deal) => (
           <div
             key={deal.id}
             className="relative bg-[#1a1a1a] rounded-3xl p-7 sm:p-8 border border-white/5 hover:border-white/20 transition-all shadow-xl overflow-hidden flex flex-col justify-between group"
