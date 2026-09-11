@@ -48,6 +48,30 @@ async function api(path: string, init?: RequestInit) {
   return data;
 }
 
+async function imageDataUrlToWebpBlob(dataUrl: string) {
+  const image = new Image();
+  image.decoding = 'async';
+  await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('Image illisible.')); image.src = dataUrl; });
+  const scale = Math.min(1, 800 / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Optimisation image impossible.');
+  context.drawImage(image, 0, 0, width, height);
+  let quality = 0.82;
+  let blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', quality));
+  while (blob && blob.size > 1024 * 1024 && quality > 0.45) {
+    quality -= 0.08;
+    blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', quality));
+  }
+  if (!blob || blob.type !== 'image/webp') throw new Error('Photo WebP invalide.');
+  if (blob.size > 1024 * 1024) throw new Error('Photo trop volumineuse après optimisation.');
+  return blob;
+}
+
 export function loadOnlineContent(): Promise<ContentSnapshot> {
   if (!loading) loading = api('content').then((data: ContentSnapshot) => {
     if (!data.content || !Array.isArray(data.content.menuItems) || !Array.isArray(data.content.categories) || !Array.isArray(data.content.comboDeals) || !Array.isArray(data.content.pizzaSupplements) || !data.content.restaurantInfo || !Number.isSafeInteger(data.revision)) throw new Error('Réponse du serveur invalide.');
@@ -62,8 +86,8 @@ export async function publishSiteContent(content: SiteContent, revision: number,
   const prepared = structuredClone(content);
   for (const item of prepared.menuItems) {
     if (!item.image.startsWith('data:')) continue;
-    const blob = await (await fetch(item.image)).blob();
-    const uploaded = await api('images', { method: 'POST', headers: { 'Content-Type': blob.type, Authorization: `Bearer ${password}` }, body: blob });
+    const blob = await imageDataUrlToWebpBlob(item.image);
+    const uploaded = await api('images', { method: 'POST', headers: { 'Content-Type': 'image/webp', Authorization: `Bearer ${password}` }, body: blob });
     item.image = uploaded.url;
   }
   const result = await api('content', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${password}` }, body: JSON.stringify({ content: prepared, revision }) });
@@ -92,6 +116,8 @@ export async function changeAdminPassword(currentPassword: string, newPassword: 
 
 export function resetSiteContent() {
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(CACHE_KEY);
+  published = undefined;
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
